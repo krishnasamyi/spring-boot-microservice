@@ -4,6 +4,7 @@ public class MovieInfo {
 
 	private String movieId;
 	private String movieName;
+	
 
 	public MovieInfo(String movieId, String movieName) {
 		super();
