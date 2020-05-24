@@ -16,6 +16,9 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
+
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 
 @RestController
 @RequestMapping(value = "/catalog")
@@ -39,9 +42,13 @@ public class MovieCatalogController {
 	 */
 
 	@RequestMapping(value = "/{userId}")
+	@HystrixCommand(commandProperties = {
+			@HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "500"),
+			@HystrixProperty(name = "circuitBreaker.sleepWindowInMilliseconds", value = "1000"),
+			@HystrixProperty(name = "circuitBreaker.errorThresholdPercentage", value = "50") }, fallbackMethod = "getCatalogsFallback")
 	public List<MovieCatalog> getCatalogs(@PathVariable("userId") String userId) {
 		/*
-		 * List<MovieInfo> movies = Arrays.asList(new MovieInfo("123", "Sarakr"), new
+		 * List<MovieInfo> movies = Arrays.asList(new MovieInfo("123", "Sarkar"), new
 		 * MovieInfo("133", "Darbar"), new MovieInfo("222", "Petta"));
 		 */
 
@@ -70,6 +77,10 @@ public class MovieCatalogController {
 					MovieInfo.class);
 			return new MovieCatalog(userId, movieRating.getMovieId(), movie.getMovieName(), movieRating.getRating());
 		}).collect(Collectors.toList());
+	}
+
+	public List<MovieCatalog> getCatalogsFallback(@PathVariable("userId") String userId) {
+		return Arrays.asList(new MovieCatalog(userId, "", "Movie not found", "0"));
 	}
 
 }
