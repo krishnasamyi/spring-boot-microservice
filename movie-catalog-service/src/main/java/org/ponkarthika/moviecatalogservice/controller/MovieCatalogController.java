@@ -42,10 +42,10 @@ public class MovieCatalogController {
 	 */
 
 	@RequestMapping(value = "/{userId}")
-	@HystrixCommand(commandProperties = {
+	/*@HystrixCommand(commandProperties = {
 			@HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "500"),
 			@HystrixProperty(name = "circuitBreaker.sleepWindowInMilliseconds", value = "1000"),
-			@HystrixProperty(name = "circuitBreaker.errorThresholdPercentage", value = "50") }, fallbackMethod = "getCatalogsFallback")
+			@HystrixProperty(name = "circuitBreaker.errorThresholdPercentage", value = "50") }, fallbackMethod = "getCatalogsFallback")*/
 	public List<MovieCatalog> getCatalogs(@PathVariable("userId") String userId) {
 		/*
 		 * List<MovieInfo> movies = Arrays.asList(new MovieInfo("123", "Sarkar"), new
@@ -63,8 +63,7 @@ public class MovieCatalogController {
 		 */
 
 		/* Rest template approach */
-		MovieRatingWrapper movieRatingWrapper = restTemplate
-				.getForObject("http://movie-rating-service/movieRatings/" + userId, MovieRatingWrapper.class);
+		MovieRatingWrapper movieRatingWrapper = getMovieRatings(userId);
 
 		/*
 		 * MovieRatingWrapper movieRatingWrapper = webClientBuilder.build().get()
@@ -73,14 +72,37 @@ public class MovieCatalogController {
 		 */
 
 		return movieRatingWrapper.getMovieRatings().stream().map(movieRating -> {
-			MovieInfo movie = restTemplate.getForObject("http://movie-info-service/movie/" + movieRating.getMovieId(),
-					MovieInfo.class);
+			MovieInfo movie = getMovieInfo(movieRating);
 			return new MovieCatalog(userId, movieRating.getMovieId(), movie.getMovieName(), movieRating.getRating());
 		}).collect(Collectors.toList());
+	}
+
+	@HystrixCommand(fallbackMethod = "getMovieInfoFallback")
+	private MovieInfo getMovieInfo(MovieRating movieRating) {
+		MovieInfo movie = restTemplate.getForObject("http://movie-info-service/movie/" + movieRating.getMovieId(),
+				MovieInfo.class);
+		return movie;
+	}
+	
+	private MovieInfo getMovieInfoFallback(MovieRating movieRating) {
+		return new MovieInfo("0", "Movie not found");
+	}
+
+	@HystrixCommand(fallbackMethod = "getMovieRatingsFallback")
+	private MovieRatingWrapper getMovieRatings(String userId) {
+		MovieRatingWrapper movieRatingWrapper = restTemplate
+				.getForObject("http://movie-rating-service/movieRatings/" + userId, MovieRatingWrapper.class);
+		return movieRatingWrapper;
+	}
+	
+	private MovieRatingWrapper getMovieRatingsFallback(String userId) {
+		return new MovieRatingWrapper(Arrays.asList(new MovieRating(userId, "0", "Rating not found")));
 	}
 
 	public List<MovieCatalog> getCatalogsFallback(@PathVariable("userId") String userId) {
 		return Arrays.asList(new MovieCatalog(userId, "", "Movie not found", "0"));
 	}
+	
+	
 
 }
